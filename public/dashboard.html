@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>清水高中班際排球賽 控制台</title>
+    <style>
+        body { background: #1e1e1e; color: #fff; font-family: sans-serif; padding: 20px; margin: 0; }
+        .dashboard { max-width: 900px; margin: 0 auto; background: #2a2a2a; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        .tabs { display: flex; background: #111; cursor: pointer; }
+        .tab { flex: 1; padding: 15px; text-align: center; font-weight: bold; color: #888; transition: 0.3s; }
+        .tab.active { background: #2a2a2a; color: #00c0a8; border-bottom: 3px solid #00c0a8; }
+        .tab-content { display: none; padding: 20px; }
+        .tab-content.active { display: block; }
+
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+        
+        .team-box { background: #333; padding: 20px; border-radius: 8px; border-top: 5px solid #00c0a8; }
+        .team-box.team-b { border-top-color: #ff4655; }
+        
+        label { display: block; margin-top: 15px; font-size: 14px; color: #aaa; }
+        input[type="text"], input[type="number"] { width: 100%; padding: 10px; margin-top: 5px; background: #111; border: 1px solid #555; color: white; border-radius: 4px; box-sizing: border-box;}
+        
+        .score-row { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; background: #222; padding: 10px; border-radius: 6px;}
+        .score-val { font-size: 32px; font-weight: bold; width: 60px; text-align: center; color: #f8c11c;}
+        button.btn-calc { background: #555; border: none; color: white; font-size: 24px; width: 40px; height: 40px; border-radius: 4px; cursor: pointer; }
+        
+        .serve-radio { display: flex; align-items: center; margin-top: 15px; background: #444; padding: 10px; border-radius: 4px; cursor: pointer; }
+        .serve-radio input { transform: scale(1.5); margin-right: 10px;}
+        
+        .big-btn { padding: 15px; font-size: 18px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; transition: 0.2s; width: 100%; margin-top: 20px;}
+        .btn-update { background: #f8c11c; color: #000; }
+        .btn-admin { background: #ff4655; color: #fff; }
+        
+        .pos-group { display: flex; gap: 10px; margin-top: 5px; }
+        .pos-group input { margin-top: 0; }
+        .admin-panel { background: #333; padding: 20px; border-radius: 8px; border: 1px dashed #ff4655; margin-top: 20px;}
+    </style>
+</head>
+<body>
+
+<div class="dashboard">
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('control')">🏐 賽事控制 (計分)</div>
+        <div class="tab" onclick="switchTab('admin')">🔒 位置</div>
+    </div>
+
+    <div id="tab-control" class="tab-content active">
+        <div class="grid">
+            <div class="team-box">
+                <h2>上半部 (Team A)</h2>
+                <label>名稱</label><input type="text" id="nameA" value="201">
+                <label>局數 (SET)</label>
+                <div class="score-row"><button class="btn-calc" onclick="change('setsA', -1)">-</button><div class="score-val" id="setsA">0</div><button class="btn-calc" onclick="change('setsA', 1)">+</button></div>
+                <label>比分 (POINT)</label>
+                <div class="score-row"><button class="btn-calc" onclick="change('scoreA', -1)">-</button><div class="score-val" id="scoreA">0</div><button class="btn-calc" onclick="change('scoreA', 1)">+</button></div>
+                <label class="serve-radio"><input type="radio" name="serve" value="A"> 給予球權</label>
+            </div>
+
+            <div class="team-box team-b">
+                <h2>下半部 (Team B)</h2>
+                <label>名稱</label><input type="text" id="nameB" value="209">
+                <label>局數 (SET)</label>
+                <div class="score-row"><button class="btn-calc" onclick="change('setsB', -1)">-</button><div class="score-val" id="setsB">0</div><button class="btn-calc" onclick="change('setsB', 1)">+</button></div>
+                <label>比分 (POINT)</label>
+                <div class="score-row"><button class="btn-calc" onclick="change('scoreB', -1)">-</button><div class="score-val" id="scoreB">0</div><button class="btn-calc" onclick="change('scoreB', 1)">+</button></div>
+                <label class="serve-radio"><input type="radio" name="serve" value="B"> 給予球權</label>
+            </div>
+        </div>
+        <button class="big-btn btn-update" onclick="sendData()">🔄 同步比分</button>
+        <div style="display:flex; gap:10px;">
+            <button class="big-btn" style="background:#00c0a8; color:white;" onclick="socket.emit('control-overlay', 'show')">進場 (Show)</button>
+            <button class="big-btn" style="background:transparent; border:2px solid #ff4655; color:#ff4655;" onclick="socket.emit('control-overlay', 'hide')">退場 (Hide)</button>
+        </div>
+    </div>
+
+    <div id="tab-admin" class="tab-content">
+        <div class="grid">
+            <div class="team-box">
+                <h3>Team A (上半部)</h3>
+                <label>📍 隊伍名稱 (上% / 左%)</label>
+                <div class="pos-group"><input type="number" id="pos-nameA-top" value="44"><input type="number" id="pos-nameA-left" value="45"></div>
+                
+                <label>📍 局數 SET (上% / 左%)</label>
+                <div class="pos-group"><input type="number" id="pos-setA-top" value="44"><input type="number" id="pos-setA-left" value="59"></div>
+                
+                <label>📍 分數 POINT (上% / 左%)</label>
+                <div class="pos-group"><input type="number" id="pos-pointA-top" value="44"><input type="number" id="pos-pointA-left" value="70"></div>
+            </div>
+            
+            <div class="team-box team-b">
+                <h3>Team B (下半部)</h3>
+                <label>📍 隊伍名稱 (上% / 左%)</label>
+                <div class="pos-group"><input type="number" id="pos-nameB-top" value="66"><input type="number" id="pos-nameB-left" value="45"></div>
+                
+                <label>📍 局數 SET (上% / 左%)</label>
+                <div class="pos-group"><input type="number" id="pos-setB-top" value="66"><input type="number" id="pos-setB-left" value="59"></div>
+                
+                <label>📍 分數 POINT (上% / 左%)</label>
+                <div class="pos-group"><input type="number" id="pos-pointB-top" value="66"><input type="number" id="pos-pointB-left" value="70"></div>
+            </div>
+        </div>
+        <div class="admin-panel">
+            <input type="password" id="admin-password" style="display: none;"> <button class="big-btn btn-admin" onclick="sendPosition()">🚀 強制覆蓋版面位置</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script>
+    const socket = io(); 
+
+    function switchTab(tabName) {
+        if (tabName === 'admin') {
+            const pwd = prompt("🔒 請輸入導播密碼：");
+            if (!pwd) return; 
+
+            socket.emit('verify-password', pwd, (isCorrect) => {
+                if (isCorrect) {
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                    document.querySelectorAll('.tab')[1].classList.add('active'); 
+                    document.getElementById('tab-admin').classList.add('active');
+                    document.getElementById('admin-password').value = pwd; 
+                } else {
+                    alert("❌ 密碼錯誤，你沒有權限喔！");
+                }
+            });
+        } else {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.tab')[0].classList.add('active');
+            document.getElementById('tab-control').classList.add('active');
+        }
+    }
+
+    function change(id, delta) {
+        let el = document.getElementById(id);
+        el.innerText = Math.max(0, parseInt(el.innerText) + delta);
+        sendData();
+    }
+
+    function sendData() {
+        const data = {
+            nameA: document.getElementById('nameA').value, setsA: document.getElementById('setsA').innerText, scoreA: document.getElementById('scoreA').innerText,
+            nameB: document.getElementById('nameB').value, setsB: document.getElementById('setsB').innerText, scoreB: document.getElementById('scoreB').innerText,
+            servTeam: document.querySelector('input[name="serve"]:checked')?.value || 'none'
+        };
+        socket.emit('update-data', data);
+    }
+
+    function sendPosition() {
+        const payload = {
+            password: document.getElementById('admin-password').value,
+            positions: {
+                nameA: { top: document.getElementById('pos-nameA-top').value, left: document.getElementById('pos-nameA-left').value },
+                setA: { top: document.getElementById('pos-setA-top').value, left: document.getElementById('pos-setA-left').value },
+                pointA: { top: document.getElementById('pos-pointA-top').value, left: document.getElementById('pos-pointA-left').value },
+                nameB: { top: document.getElementById('pos-nameB-top').value, left: document.getElementById('pos-nameB-left').value },
+                setB: { top: document.getElementById('pos-setB-top').value, left: document.getElementById('pos-setB-left').value },
+                pointB: { top: document.getElementById('pos-pointB-top').value, left: document.getElementById('pos-pointB-left').value }
+            }
+        };
+        socket.emit('update-position', payload);
+    }
+
+    socket.on('auth-result', (res) => { alert(res.msg); });
+    document.querySelectorAll('input[name="serve"]').forEach(r => r.addEventListener('change', sendData));
+    
+    // ==========================================
+    // 👇 接收來自 Stream Deck 的遙控指令 (已修復) 👇
+    // ==========================================
+    socket.on('streamdeck-command', (cmd) => {
+        // 加減分
+        if (cmd.action === 'add-score') change('score' + cmd.team, 1);
+        if (cmd.action === 'sub-score') change('score' + cmd.team, -1);
+        
+        // 加減局數
+        if (cmd.action === 'add-set') change('sets' + cmd.team, 1);
+        if (cmd.action === 'sub-set') change('sets' + cmd.team, -1);
+        
+        // 球權切換
+        if (cmd.action === 'serve') {
+            document.querySelector(`input[name="serve"][value="${cmd.team}"]`).checked = true;
+            sendData(); 
+        }
+
+        // 清除球權
+        if (cmd.action === 'clear-serve') {
+            document.querySelectorAll('input[name="serve"]').forEach(r => r.checked = false);
+            sendData();
+        }
+
+        // 強制同步所有資料
+        if (cmd.action === 'sync') {
+            sendData(); 
+        }
+    }); // <--- 就是漏了這個大括號跟分號啦！
+    // ==========================================
+</script>
+</body>
+</html>
