@@ -98,7 +98,7 @@
 <script>
     // ⚠️ 記得確保這裡的 IP 正確喔！
     const SERVER_IP = '192.168.68.108'; 
-    const socket = io(`http://${SERVER_IP}:3000`);
+    const socket = io();
 
     // 加減分邏輯
     function change(id, delta) {
